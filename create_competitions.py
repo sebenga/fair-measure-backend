@@ -1,4 +1,3 @@
-
 import requests
 from datetime import datetime
 import traceback
@@ -25,7 +24,9 @@ payload_template = {
     "league_table": ["table1"],
     "posts": ["post1"],
     "photos": ["photo1"],
-    "videos": ["video1"]
+    "videos": ["video1"],
+    "default_photo_repositories": [],
+    "default_video_repositories": []
 }
 
 for i in range(1, 51):

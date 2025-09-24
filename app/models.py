@@ -97,3 +97,5 @@ class Competition(BaseModel):
     posts: List[str] = []
     photos: List[str] = []
     videos: List[str] = []
+    default_photo_repositories: List[str] = []
+    default_video_repositories: List[str] = []
