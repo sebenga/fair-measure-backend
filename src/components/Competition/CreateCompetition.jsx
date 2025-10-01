@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+
+const API_URL = 'http://localhost:8000'
 
 export default function CreateCompetition({ onClose, onSuccess }) {
   const [name, setName] = useState('')
@@ -8,7 +9,7 @@ export default function CreateCompetition({ onClose, onSuccess }) {
   const [isPrivate, setIsPrivate] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -16,20 +17,23 @@ export default function CreateCompetition({ onClose, onSuccess }) {
     setLoading(true)
 
     try {
-      const { data, error } = await supabase
-        .from('competitions')
-        .insert([
-          {
-            name,
-            type,
-            is_private: isPrivate,
-            owner_id: user.id
-          }
-        ])
-        .select()
-        .single()
+      const response = await fetch(`${API_URL}/competitions/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          author: profile.email,
+          owner_id: user.id,
+          type,
+          is_private: isPrivate,
+          date_created: new Date().toISOString(),
+          rules: [],
+          scoring_categories: [],
+          point_accumulation: { win: 3, draw: 1, lose: 0 }
+        })
+      })
 
-      if (error) throw error
+      if (!response.ok) throw new Error('Failed to create competition')
       onSuccess()
     } catch (err) {
       setError(err.message)

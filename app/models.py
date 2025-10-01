@@ -80,10 +80,28 @@ class Media(BaseModel):
     location: Optional[str]
     url: Optional[str]
 
+class Profile(BaseModel):
+    id: Optional[str]
+    user_id: str
+    email: str
+    full_name: Optional[str]
+    avatar_url: Optional[str]
+    provider: str = "email"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class CompetitionMember(BaseModel):
+    id: Optional[str]
+    competition_id: str
+    user_id: str
+    role: str
+    joined_at: datetime = Field(default_factory=datetime.utcnow)
+
 class Competition(BaseModel):
     id: Optional[str]
     name: str
     author: str
+    owner_id: Optional[str]
     date_created: datetime
     logo_location: Optional[str]
     is_private: bool

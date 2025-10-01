@@ -14,6 +14,8 @@ from app.routers.point_accumulation import router as point_accumulation_router
 from app.routers.fixture_team import router as fixture_team_router
 from app.routers.scoring_event import router as scoring_event_router
 from app.routers.reply import router as reply_router
+from app.routers.profiles import router as profiles_router
+from app.routers.members import router as members_router
 
 app = FastAPI(title="Fair Measure Competition API", description="Dynamic backend for custom competitions", version="1.0.0")
 app.add_middleware(
@@ -35,6 +37,8 @@ app.include_router(point_accumulation_router)
 app.include_router(fixture_team_router)
 app.include_router(scoring_event_router)
 app.include_router(reply_router)
+app.include_router(profiles_router)
+app.include_router(members_router)
 
 # MongoDB connection
 MONGO_URL = "mongodb+srv://fair-measure:fairmeasure321@fair-measure-db.rkujgqk.mongodb.net/?retryWrites=true&w=majority&appName=fair-measure-db"

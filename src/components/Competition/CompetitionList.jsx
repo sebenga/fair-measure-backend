@@ -1,49 +1,49 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import CompetitionCard from './CompetitionCard'
 import CreateCompetition from './CreateCompetition'
 import './Competition.css'
+
+const API_URL = 'http://localhost:8000'
 
 export default function CompetitionList() {
   const [competitions, setCompetitions] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [filter, setFilter] = useState('all')
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
 
   useEffect(() => {
-    fetchCompetitions()
-  }, [filter, user])
+    if (user && profile) {
+      fetchCompetitions()
+    }
+  }, [filter, user, profile])
 
   const fetchCompetitions = async () => {
     try {
       setLoading(true)
-      let query = supabase
-        .from('competitions')
-        .select(`
-          *,
-          owner:profiles!competitions_owner_id_fkey(id, full_name, email),
-          competition_members(user_id, role)
-        `)
-        .order('created_at', { ascending: false })
+      let url = `${API_URL}/competitions/`
 
       if (filter === 'owned') {
-        query = query.eq('owner_id', user.id)
+        url += `?owner_id=${user.id}`
       } else if (filter === 'member') {
-        query = query.in('id',
-          supabase
-            .from('competition_members')
-            .select('competition_id')
-            .eq('user_id', user.id)
-            .neq('role', 'owner')
-        )
+        url += `?member_id=${user.id}`
       }
 
-      const { data, error } = await query
+      const response = await fetch(url)
+      if (!response.ok) throw new Error('Failed to fetch competitions')
 
-      if (error) throw error
-      setCompetitions(data || [])
+      const data = await response.json()
+
+      const enrichedData = await Promise.all(
+        data.map(async (comp) => {
+          const membersResponse = await fetch(`${API_URL}/members/competition/${comp.id}`)
+          const members = membersResponse.ok ? await membersResponse.json() : []
+          return { ...comp, competition_members: members }
+        })
+      )
+
+      setCompetitions(enrichedData)
     } catch (error) {
       console.error('Error fetching competitions:', error)
     } finally {

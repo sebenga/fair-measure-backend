@@ -42,16 +42,23 @@ export const AuthProvider = ({ children }) => {
 
   const fetchProfile = async (userId) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle()
+      const response = await fetch(`http://localhost:8000/profiles/user/${userId}`)
 
-      if (error) throw error
+      if (response.status === 404) {
+        setProfile(null)
+        setLoading(false)
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch profile')
+      }
+
+      const data = await response.json()
       setProfile(data)
     } catch (error) {
       console.error('Error fetching profile:', error)
+      setProfile(null)
     } finally {
       setLoading(false)
     }
@@ -68,6 +75,24 @@ export const AuthProvider = ({ children }) => {
         }
       }
     })
+
+    if (!error && data.user) {
+      try {
+        await fetch('http://localhost:8000/profiles/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: data.user.id,
+            email: data.user.email,
+            full_name: fullName,
+            provider: 'email'
+          })
+        })
+      } catch (profileError) {
+        console.error('Error creating profile:', profileError)
+      }
+    }
+
     return { data, error }
   }
 
@@ -77,6 +102,24 @@ export const AuthProvider = ({ children }) => {
       password
     })
     return { data, error }
+  }
+
+  const syncProfile = async (user, provider) => {
+    try {
+      await fetch('http://localhost:8000/profiles/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name || user.user_metadata?.name,
+          avatar_url: user.user_metadata?.avatar_url,
+          provider: provider
+        })
+      })
+    } catch (error) {
+      console.error('Error syncing profile:', error)
+    }
   }
 
   const signInWithGoogle = async () => {
@@ -115,19 +158,25 @@ export const AuthProvider = ({ children }) => {
   }
 
   const updateProfile = async (updates) => {
-    if (!user) return { error: new Error('No user logged in') }
+    if (!user || !profile) return { error: new Error('No user logged in') }
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', user.id)
-      .select()
-      .single()
+    try {
+      const response = await fetch(`http://localhost:8000/profiles/${profile.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...profile, ...updates })
+      })
 
-    if (!error) {
+      if (!response.ok) {
+        throw new Error('Failed to update profile')
+      }
+
+      const data = await response.json()
       setProfile(data)
+      return { data, error: null }
+    } catch (error) {
+      return { data: null, error }
     }
-    return { data, error }
   }
 
   const value = {

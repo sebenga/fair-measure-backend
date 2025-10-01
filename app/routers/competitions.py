@@ -31,21 +31,39 @@ DEFAULT_VIDEO_REPOSITORIES = [
 async def create_competition(competition: Competition, request: Request):
     db = request.app.state.db
     comp_dict = competition.dict(exclude_unset=True)
-    
-    # Add default media repositories if not provided
+
     if not comp_dict.get("default_photo_repositories"):
         comp_dict["default_photo_repositories"] = DEFAULT_PHOTO_REPOSITORIES
     if not comp_dict.get("default_video_repositories"):
         comp_dict["default_video_repositories"] = DEFAULT_VIDEO_REPOSITORIES
-    
+
     result = await db["competitions"].insert_one(comp_dict)
-    comp_dict["id"] = str(result.inserted_id)
+    competition_id = str(result.inserted_id)
+    comp_dict["id"] = competition_id
+
+    if comp_dict.get("owner_id"):
+        await db["competition_members"].insert_one({
+            "competition_id": competition_id,
+            "user_id": comp_dict["owner_id"],
+            "role": "owner"
+        })
+
     return Competition(**comp_dict)
 
 @router.get("/competitions/", response_model=List[Competition])
-async def list_competitions(request: Request):
+async def list_competitions(request: Request, owner_id: str = None, member_id: str = None):
     db = request.app.state.db
-    cursor = db["competitions"].find()
+
+    if owner_id:
+        cursor = db["competitions"].find({"owner_id": owner_id})
+    elif member_id:
+        member_competitions = []
+        async for member in db["competition_members"].find({"user_id": member_id}):
+            member_competitions.append(member["competition_id"])
+        cursor = db["competitions"].find({"id": {"$in": member_competitions}})
+    else:
+        cursor = db["competitions"].find()
+
     competitions = []
     async for doc in cursor:
         doc["id"] = str(doc["_id"])

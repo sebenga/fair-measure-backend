@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
+
+const API_URL = 'http://localhost:8000'
 
 export default function ManageMembers({ competition, onClose, onUpdate }) {
   const [members, setMembers] = useState([])
@@ -14,17 +15,10 @@ export default function ManageMembers({ competition, onClose, onUpdate }) {
 
   const fetchMembers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('competition_members')
-        .select(`
-          id,
-          role,
-          joined_at,
-          user:profiles(id, full_name, email, avatar_url)
-        `)
-        .eq('competition_id', competition.id)
+      const response = await fetch(`${API_URL}/members/competition/${competition.id}`)
+      if (!response.ok) throw new Error('Failed to fetch members')
 
-      if (error) throw error
+      const data = await response.json()
       setMembers(data || [])
     } catch (err) {
       console.error('Error fetching members:', err)
@@ -38,17 +32,13 @@ export default function ManageMembers({ competition, onClose, onUpdate }) {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, avatar_url')
-        .ilike('email', `%${email}%`)
-        .limit(5)
+      const response = await fetch(`${API_URL}/profiles/?email=${encodeURIComponent(email)}`)
+      if (!response.ok) throw new Error('Failed to search users')
 
-      if (error) throw error
-
-      const currentMemberIds = members.map(m => m.user.id)
+      const data = await response.json()
+      const currentMemberIds = members.map(m => m.user.user_id)
       const filteredResults = (data || []).filter(
-        user => !currentMemberIds.includes(user.id)
+        user => !currentMemberIds.includes(user.user_id)
       )
       setSearchResults(filteredResults)
     } catch (err) {
@@ -61,17 +51,17 @@ export default function ManageMembers({ competition, onClose, onUpdate }) {
     setLoading(true)
 
     try {
-      const { error } = await supabase
-        .from('competition_members')
-        .insert([
-          {
-            competition_id: competition.id,
-            user_id: userId,
-            role: 'member'
-          }
-        ])
+      const response = await fetch(`${API_URL}/members/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          competition_id: competition.id,
+          user_id: userId,
+          role: 'member'
+        })
+      })
 
-      if (error) throw error
+      if (!response.ok) throw new Error('Failed to add member')
 
       setSearchEmail('')
       setSearchResults([])
@@ -91,12 +81,11 @@ export default function ManageMembers({ competition, onClose, onUpdate }) {
     setLoading(true)
 
     try {
-      const { error } = await supabase
-        .from('competition_members')
-        .delete()
-        .eq('id', memberId)
+      const response = await fetch(`${API_URL}/members/${memberId}`, {
+        method: 'DELETE'
+      })
 
-      if (error) throw error
+      if (!response.ok) throw new Error('Failed to remove member')
 
       await fetchMembers()
       onUpdate()

@@ -24,7 +24,7 @@ export default function CompetitionCard({ competition, onUpdate }) {
           </div>
           <p className="competition-type">{competition.type}</p>
           <p className="competition-owner">
-            Owner: {competition.owner?.full_name || competition.owner?.email}
+            Owner: {competition.author || 'Unknown'}
           </p>
           <div className="competition-stats">
             <span>{memberCount} {memberCount === 1 ? 'member' : 'members'}</span>
