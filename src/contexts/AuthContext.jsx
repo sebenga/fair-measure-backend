@@ -30,6 +30,10 @@ export const AuthProvider = ({ children }) => {
       (async () => {
         setUser(session?.user ?? null)
         if (session?.user) {
+          if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+            const provider = session.user.app_metadata?.provider || 'email'
+            await createProfileIfNotExists(session.user, provider)
+          }
           await fetchProfile(session.user.id)
         } else {
           setProfile(null)
@@ -42,19 +46,20 @@ export const AuthProvider = ({ children }) => {
 
   const fetchProfile = async (userId) => {
     try {
-      const response = await fetch(`http://localhost:8000/profiles/user/${userId}`)
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle()
 
-      if (response.status === 404) {
+      if (error) throw error
+
+      if (!data) {
         setProfile(null)
         setLoading(false)
         return
       }
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch profile')
-      }
-
-      const data = await response.json()
       setProfile(data)
     } catch (error) {
       console.error('Error fetching profile:', error)
@@ -78,16 +83,14 @@ export const AuthProvider = ({ children }) => {
 
     if (!error && data.user) {
       try {
-        await fetch('http://localhost:8000/profiles/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        await supabase
+          .from('profiles')
+          .insert({
             user_id: data.user.id,
             email: data.user.email,
             full_name: fullName,
             provider: 'email'
           })
-        })
       } catch (profileError) {
         console.error('Error creating profile:', profileError)
       }
@@ -104,21 +107,27 @@ export const AuthProvider = ({ children }) => {
     return { data, error }
   }
 
-  const syncProfile = async (user, provider) => {
+  const createProfileIfNotExists = async (user, provider) => {
     try {
-      await fetch('http://localhost:8000/profiles/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: user.id,
-          email: user.email,
-          full_name: user.user_metadata?.full_name || user.user_metadata?.name,
-          avatar_url: user.user_metadata?.avatar_url,
-          provider: provider
-        })
-      })
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!existingProfile) {
+        await supabase
+          .from('profiles')
+          .insert({
+            user_id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+            avatar_url: user.user_metadata?.avatar_url || null,
+            provider: provider
+          })
+      }
     } catch (error) {
-      console.error('Error syncing profile:', error)
+      console.error('Error creating profile:', error)
     }
   }
 
@@ -161,17 +170,15 @@ export const AuthProvider = ({ children }) => {
     if (!user || !profile) return { error: new Error('No user logged in') }
 
     try {
-      const response = await fetch(`http://localhost:8000/profiles/${profile.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...profile, ...updates })
-      })
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('user_id', user.id)
+        .select()
+        .single()
 
-      if (!response.ok) {
-        throw new Error('Failed to update profile')
-      }
+      if (error) throw error
 
-      const data = await response.json()
       setProfile(data)
       return { data, error: null }
     } catch (error) {
